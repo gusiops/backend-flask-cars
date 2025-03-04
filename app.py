@@ -1,9 +1,24 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+from flask_sqlalchemy import SQLAlchemy
+import logging
 
 app = Flask(__name__)
 
-CORS(app)  # Разрешить запросы с любого источника
+# Настройка CORS
+CORS(
+    app,
+    origins=["https://filatov.website", "http://filatov.website:5000", "http://filatov.website"],
+    methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization"],
+    supports_credentials=True,
+    max_age=600
+)
+
+# Логирование
+app.logger.setLevel(logging.DEBUG)
+
+# data
 
 cars_data = [
   {
@@ -83,7 +98,7 @@ cars_data = [
     "prices": [
       1000,
       900,
-      800
+      801
     ]
   },
   {
@@ -128,49 +143,61 @@ cars_data = [
   }
 ]
 
+
+# Конфигурация базы данных
+app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://vlad:1g2h5749@filatov.website:5432/test'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False  # Исправленная опечатка
+
+db = SQLAlchemy(app)
+
+# Модель Order
+
+class Order(db.Model):
+    __tablename__ = 'order'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)  # Имя клиента
+    car = db.Column(db.String(100), nullable=False)  # Название автомобиля
+    phone = db.Column(db.String(20), nullable=False)  # Номер телефона (строка)
+
+# Создание таблицы
+with app.app_context():
+    db.create_all()
+
 @app.route('/cars-data', methods=['GET'])
 def get_cars():
     filter_name = request.args.get('filter', '')
-    
-    # Фильтрация по названию
     if filter_name in ['', 'Все марки']:
         return jsonify(cars_data)
-    
-    filtered = [
-        car for car in cars_data 
-        if filter_name.lower() in car['title'].lower()
-    ]
+    filtered = [car for car in cars_data if filter_name.lower() in car['title'].lower()]
     return jsonify(filtered)
 
-@app.route('/cars-order', methods=['POST', 'OPTIONS'])
-def create_order():
-    if request.method == 'OPTIONS':
-        # Обработка предварительных CORS-запросов
-        return jsonify({"status": "ok"}), 200
-    
-    data = request.json
-    
-    # Валидация данных
-    if not all([
-        data.get('car'),
-        data.get('name'),
-        len(data.get('phone', '')) >= 10
-    ]):
+@app.route('/cars-order', methods=['POST'])
+def create_order_car():
+    try:
+        data = request.get_json()
+        if data is None:
+            return jsonify({"error": "Invalid JSON"}), 400
+
+        name = data.get('name')
+        car = data.get('car')
+        phone = data.get('phone')
+
+        if not name or not car or not phone:
+            return jsonify({"error": "Missing required fields"}), 400
+
+        new_order = Order(name=name, car=car, phone=phone)
+        db.session.add(new_order)
+        db.session.commit()
+
         return jsonify({
-            "message": "Ошибка валидации",
-            "error": True
-        }), 400
-    
-    # Здесь можно добавить запись в БД
-    print(f"Новый заказ: {data}")
-    
-    return jsonify({
-        "message": "Заказ успешно создан! Мы свяжемся с вами в ближайшее время.",
-        "error": False
-    })
+            "message": "Заказ успешно создан! Мы свяжемся с вами в ближайшее время.",
+            "error": False
+        })
+
+    except Exception as e:
+        app.logger.error(f"Ошибка при создании заказа: {str(e)}")
+        db.session.rollback()
+        return jsonify({"error": "Internal server error"}), 500
 
 if __name__ == '__main__':
-    app.run(
-        host='0.0.0.0',
-        port=5000
-    )
+    app.run(host='0.0.0.0', port=5000)
