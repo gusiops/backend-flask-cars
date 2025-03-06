@@ -26,7 +26,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 COPY --from=builder /root/.local /root/.local
 
-# Копирование исходного кода из builder-стадии
+# Копирование исходного кода из builder-стадии  
 COPY --from=builder /app/app.py .
 
 # Установка PATH для доступа к пользовательским пакетам
