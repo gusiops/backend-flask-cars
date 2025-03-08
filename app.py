@@ -145,7 +145,7 @@ cars_data = [
 
 
 # Конфигурация базы данных
-app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://vlad:1g2h5749@filatov.website:5432/test'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://#put_your_cred_for_db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False  # Исправленная опечатка
 
 db = SQLAlchemy(app)
